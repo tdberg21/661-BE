@@ -3,8 +3,8 @@
  * @returns { Promise<void> } 
  */
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('restaurants').del()
+  try 
+  {await knex('restaurants').del()
   await knex('restaurants').insert([
     {
       mealChoice: "Brisket Meal",
@@ -42,5 +42,7 @@ exports.seed = async function(knex) {
       experienceDescription: "Really cool logo. Food is just okay.",
       id: 4
     },
-  ]);
+  ]);} catch (error) {
+    console.log(`Error seeding data: ${error}`);
+  }
 };

@@ -1,106 +1,86 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const bodyParser = require('body-parser');
+const bodyParser = require("body-parser");
+const environment = process.env.NODE_ENV || "development";
+const configuration = require("./knexfile")[environment];
+const database = require("knex")(configuration);
 
 app.use(express.json());
 
-app.set('port', process.env.PORT || 3000);
-app.locals.title = 'BBQ BE';
+app.set("port", process.env.PORT || 3000);
+app.locals.title = "BBQ BE";
 
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
 
-app.use((request, response, next) => {
-  response.header('Access-Control-Allow-Origin', '*')
-  next()
-})
-
-app.use((request, response, next) => {
-  response.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  next()
-});
+app.use(bodyParser.json());
 
 app.use((request, response, next) => {
-  response.header('Access-Control-Allow-Headers', 'Access-Control-Allow-Headers, Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers')
-  next()
-})
-
-app.get('/', (request, response) => {
-  response.send('MMMMM BBQ');
+  response.header("Access-Control-Allow-Origin", "*");
+  next();
 });
 
-app.listen(app.get('port'), () => {
-  console.log(`${app.locals.title} is running on http://localhost:${app.get('port')}.`);
+app.use((request, response, next) => {
+  response.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS, PUT, DELETE"
+  );
+  next();
 });
 
-app.get('/api/v1/restaurants', (request, response) => {
-  const restaurants = app.locals.restaurants;
-
-  response.json({ restaurants });
+app.use((request, response, next) => {
+  response.header(
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Headers, Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"
+  );
+  next();
 });
 
-app.get('/api/v1/restaurants/:id', (request, response) => {
-  const { id } = request.params;
-  
-  const restaurant = app.locals.restaurants.find(restaurant => restaurant.id === id);
-  console.log('request', id, restaurant)
-  if (!restaurant) {
-    return response.sendStatus(404);
+app.get("/", (request, response) => {
+  response.send("MMMMM BBQ");
+});
+
+app.listen(app.get("port"), () => {
+  console.log(
+    `${app.locals.title} is running on http://localhost:${app.get("port")}.`
+  );
+});
+
+app.get("/api/v1/restaurants", async (request, response) => {
+  try {
+    const restaurants = await database("restaurants").select();
+    response.status(200).json(restaurants);
+  } catch (error) {
+    response.status(500).json({ error });
   }
-  response.status(200).json(restaurant);
 });
 
-app.post('/api/v1/restaurants', (request, response) => {
-  const id = Date.now();
-  const restaurant = request.body;
+app.post("/api/v1/restaurants", async (request, response) => {
+  console.log(request.body, request.query);
+  const restaurant = await request.body;
 
-  for (let requiredParameter of ['mealChoice', 'restaurantName', 'location', 'dateVisited', 'mealRating', 'experienceDescription']) {
+  for (let requiredParameter of [
+    "mealChoice",
+    "restaurantName",
+    "location",
+    "dateVisited",
+    "mealRating",
+    "experienceDescription",
+  ]) {
     if (!restaurant[requiredParameter]) {
       response
         .status(422)
-        .send({ error: `Expected format: { mealChoice: <String>, restaurantName: <String>, location: <String>, dateVisited: <String>, mealRating: <String>, experienceDescription: <String> }. You're missing a "${requiredParameter}" property.` });
+        .send({
+          error: `Expected format: { mealChoice: <String>, restaurantName: <String>, location: <String>, dateVisited: <String>, mealRating: <String>, experienceDescription: <String> }. You're missing a "${requiredParameter}" property.`,
+        });
     }
   }
 
-  const { mealChoice, restaurantName, location, dateVisited, mealRating, experienceDescription } = restaurant;
-  app.locals.restaurants.push({ mealChoice, restaurantName, location, dateVisited, mealRating, experienceDescription, id });
-  response.status(201).json({ mealChoice, restaurantName, location, dateVisited, mealRating, experienceDescription, id });
+  try {
+    const id = await database("restaurants").insert(restaurant, "id");
+    response.status(201).json({ id });
+  } catch (error) {
+    response.status(500).json({ error });
+  }
 });
-
-app.locals.restaurants = [
-  {
-    mealChoice: "Brisket Meal",
-    restaurantName: "AJs Pit BBQ",
-    location: "Denver, CO",
-    dateVisited: "2022-03-10",
-    mealRating: "7.6",
-    experienceDescription: "Really good Texas style bbq.",
-    id: 1
-  },
-  {
-    mealChoice: "Pulled Pork Sandwich",
-    restaurantName: "Pee Wees",
-    location: "Blacksburg, VA",
-    dateVisited: "2007-03-03",
-    mealRating: "8.9",
-    experienceDescription: "My favorite place at college, gone too soon",
-    id: 2
-  },
-  {
-    mealChoice: "Ribs",
-    restaurantName: "Smokin Yard",
-    location: "Denver, CO",
-    dateVisited: "2022-02-13",
-    mealRating: "6.7",
-    experienceDescription: "Decent, not great",
-    id: 3
-  },
-  {
-    mealChoice: "Pulled Pork Sandwich",
-    restaurantName: "Roaming Buffalo",
-    location: "Denver, CO",
-    dateVisited: "2022-03-13",
-    mealRating: "6.1",
-    experienceDescription: "Really cool logo. Food is just okay.",
-    id: 4
-  },
-];
